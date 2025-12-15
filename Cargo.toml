@@ -1,0 +1,22 @@
+[package]
+name = "capsules"
+authors = ["Ithai Levi"]
+description = "Hierarchical listboards for your terminal"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+repository = "https://github.com/rlofc/capsules"
+license-file = "./LICENSE"
+readme = "./README.md"
+
+[dependencies]
+clap = "4.5.53"
+serde = { version = "1.0.228", default-features = false, features = ["derive"] }
+toml = "0.8"
+
+[profile.release-minified]
+inherits = "release"
+strip = true
+opt-level= "z"
+lto = true
+
