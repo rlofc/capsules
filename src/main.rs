@@ -118,6 +118,8 @@ fn spin_a_new_capsule(
         .arg("-d")
         .arg("--gpus")
         .arg("all")
+        .arg("-h")
+        .arg(container_id)
         .arg("-e")
         .arg("DISPLAY=:0")
         .arg("--net=host")
