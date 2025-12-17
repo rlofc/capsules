@@ -10,7 +10,7 @@ license-file = "./LICENSE"
 readme = "./README.md"
 
 [dependencies]
-clap = "4.5.53"
+clap = { version = "4.5.53", features = ["cargo"] }
 serde = { version = "1.0.228", default-features = false, features = ["derive"] }
 toml = "0.8"
 

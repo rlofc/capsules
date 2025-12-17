@@ -230,7 +230,7 @@ fn main() {
     let cfg = Config::load();
     let matches = clap::Command::new("Capsules")
         .about("Secure-by-default containers for operating-system hygene")
-        .version("1.0")
+        .version(clap::crate_version!())
         .author("Ithai Levi")
         .subcommand(clap::Command::new("list").about("List all capsules"))
         .subcommand(
