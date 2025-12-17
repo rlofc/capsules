@@ -71,14 +71,17 @@ fn spin_a_new_capsule(
     image: &str,
     container_id: &str,
     additional_volumes: Vec<String>,
+    init: bool,
 ) {
     let source_path = format!(
         "{}/{}",
         get_user_config_folder().to_str().unwrap(),
         container_id
     );
-    if !std::path::Path::new(&source_path).exists() {
-        panic!("Source path does not exist: {}", source_path);
+    if init {
+        if !std::path::Path::new(&source_path).exists() {
+            panic!("Source path does not exist: {}", source_path);
+        }
     }
 
     let capsule_username = std::env::var("USER").unwrap_or_else(|_| {
@@ -172,16 +175,18 @@ fn spin_a_new_capsule(
         output.status
     );
 
-    let _status = Command::new("podman")
-        .arg("exec")
-        .arg("--user=root")
-        .arg(format!("capsule-{}", container_id))
-        .arg("bash")
-        .arg("/files/.bootstrap/init.sh")
-        .spawn()
-        .expect("Failed to execute command")
-        .wait()
-        .expect("Failed to wait on command");
+    if init {
+        let _status = Command::new("podman")
+            .arg("exec")
+            .arg("--user=root")
+            .arg(format!("capsule-{}", container_id))
+            .arg("bash")
+            .arg("/files/.bootstrap/init.sh")
+            .spawn()
+            .expect("Failed to execute command")
+            .wait()
+            .expect("Failed to wait on command");
+    }
 }
 
 fn delete_capsule(container_id: &str) {
@@ -252,6 +257,13 @@ fn main() {
                         .num_args(1..)
                         .value_name("host_path:container_path")
                         .help("Bind mount a volume (can be used multiple times)"),
+                )
+                .arg(
+                    clap::Arg::new("no-init")
+                        .short('f')
+                        .long("no-init")
+                        .required(false)
+                        .action(clap::ArgAction::SetFalse),
                 ),
         )
         .subcommand(
@@ -288,12 +300,13 @@ fn main() {
 
     if let Some(matches) = matches.subcommand_matches("spin") {
         let image = matches.get_one::<String>("image").unwrap();
+        let init = matches.get_flag("no-init");
         let container_id = matches.get_one::<String>("container_id").unwrap();
         let volumes = match matches.get_many::<String>("volume") {
             Some(volumes) => volumes.map(|v| v.to_owned()).collect(),
             None => Vec::new(),
         };
-        spin_a_new_capsule(&cfg, image, container_id, volumes);
+        spin_a_new_capsule(&cfg, image, container_id, volumes, init);
     }
 
     if let Some(matches) = matches.subcommand_matches("delete") {
