@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/rlofc/capsules/master/capsules.png" alt="Capsules logo" width="128"/>
+</p>
+
 # Capsules
 
 A tiny CLI wrapper around [Podman](https://podman.io/) for spinning up **capsules** - task-centric containers that keep your __Linux__ host OS clean and your various environments nicely boxed in.
@@ -33,7 +37,7 @@ And then install the default configuration if you need to:
 ```
 mkdir -p ~/.config/capsules && \
 curl -sL https://github.com/rlofc/capsules/archive/master.tar.gz | \
-tar -xzf - --strip-components=2 --skip-old-files -C ~/.config/capsules '*/capsules/*'
+tar -xzf - --wildcards --strip-components=2 --skip-old-files -C ~/.config/capsules '*/capsules/*'
 ```
 
 ## Quick Start
