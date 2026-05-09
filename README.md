@@ -1,101 +1,167 @@
 # Capsules
 
-A tiny helper around Podman for spinning up “capsules” — task-centric containers that keep your host OS clean and your various environments nicely boxed in.
-
----
-
-## Overview
-
-Capsules is a CLI wrapper for [Podman](https://podman.io/) that makes it easy to:
-
-- Create per-task / per-project containers
-- Share only the data you actually care about
-- Keep configs, home dirs, and bootstrap scripts organized
-- Hop into containers as root or as your regular user
+A tiny CLI wrapper around [Podman](https://podman.io/) for spinning up **capsules** - task-centric containers that keep your __Linux__ host OS clean and your various environments nicely boxed in.
 
 Think of it as a closed-by-default, simpler alternative to distrobox.
 
 ---
 
-## Features
+## What can it do?
 
-- Spin up podman containers as capsules
-- Initialize capsules using standard shell scripts
-- Run capsules using your host user
-- Manage capsules, list, delete, etc.
+- Easily spin up Podman containers as isolated 'capsules'
+- Use 'blueprints' as quick templates for the set-up
+- Run containers using your host UID (via `--userns=keep-id`)
+- Execute commands inside your capsule as your host user
+- But have an isolated `home` environment from your host's one
+- Root console access for maintenance of capsules
+- Sensible defaults for GPU, audio and X11 are built-in
 
-### Configuration
+---
 
-Capsules looks under `~/.config/capsules` for its config and bootstrap bits.
+## Installation
+
+First, make sure you have `tar` and `podman` installed on your host (Capsules uses the `podman` CLI to implement most of its commands, and uses `tar` when building Dockerfile images)
+
+Then run:
+
+```sh
+cargo install capsules
+```
+
+And then install the default configuration if you need to:
+
+```
+mkdir -p ~/.config/capsules && \
+curl -sL https://github.com/rlofc/capsules/archive/master.tar.gz | \
+tar -xzf - --strip-components=2 --skip-old-files -C ~/.config/capsules '*/capsules/*'
+```
+
+## Quick Start
+
+### Basic use
+
+```sh
+mkdir my_capsule && cd my_capsule
+capsules init debian && capsules spin my_capsule && capsules exec my_capsule bash
+```
+
+### Mounting your workspace
+
+Change `/your/projects/dir` to where your workspace is. It will be mounted as a Podman volume.
+
+```sh
+mkdir my_capsule && cd my_capsule
+capsules init debian
+capsules spin my_capsule --volume /your/projects/dir:/your/projects/dir
+capsules exec my_capsule bash
+```
+
+
+## User Guide
+
+### Commands
+
+```
+$ capsules --help
+
+Secure-by-default containers for operating-system hygene
+
+Usage: capsules [COMMAND]
+
+Commands:
+  list     List all capsules
+  console  Start a console root session
+  exec     Executes a command in a running container
+  init     Init container volume
+  spin     Spins up a new container
+  start    Starts a container
+  stop     Stops a container
+  delete   Deletes a container
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+
+```
+
+### Configuration 
+
+Capsules looks under `~/.config/capsules` for its config and blueprints.
 
 #### `capsules.toml`
-
-Optional, but handy:
 
 ```toml
 # ~/.config/capsules/capsules.toml
 
-# Where to store per-capsule volumes (home dirs, bootstrap, etc.)
-# If relative, it's resolved from $HOME.
-volumes_root = "/files/capsules/volumes"
+# Where will capsules locate your host volume folder
+# (This is the folder you used the `capsules init ..` command in)
+capsule_volume_dir = "/files"
 
-# What the container considers its "home root"
+# What the container considers its "home root". This will be
+# appended to the capsule_volume_dir.
 # (your username is appended, e.g. /home/youruser)
-capsule_home_dir = "/home"
+capsule_home_dir = "home"
 ```
 
-If you skip this file:
 
-- `volumes_root` defaults to: `~/.local/capsules/volumes`
-- `capsule_home_dir` defaults to: `/home`
+### Blueprints
 
-#### Bootstrap scripts
+Capsules uses __blueprints__ to set up an image and initialization code when spinning up podman containers. 
 
-When you run:
+#### Blueprint directory structure
+
+Blueprints live under `~/.config/capsules/<name>/`. Each blueprint is a directory containing a `Dockerfile`, a `capsule.toml`, and an optional `init.sh`.
+
+```text
+~/.config/capsules/<name>/
+  Dockerfile       # Required - build context for `podman build`
+  capsule.toml     # Required - contains `blueprint = "<name>"`
+  init.sh          # Optional - post-start initialization script
+```
+
+#### A minimal blueprint:
+
+```text
+~/.config/capsules/my-blueprint/
+  Dockerfile
+  capsule.toml
+  init.sh
+```
+
+**Dockerfile** - the base image:
+
+```dockerfile
+FROM debian:latest
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sudo curl bash
+```
+
+**capsule.toml** - maps this blueprint directory to the Docker image tag:
+
+```toml
+blueprint = "my-blueprint"
+```
+
+**init.sh** - runs inside the container after it starts (as root):
 
 ```bash
-capsules spin <image> <container_id>
+#!/bin/bash
+echo "$CAPSULE_USERNAME ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 ```
 
-Capsules expects a directory:
+The `init.sh` script has access to these environment variables set by Capsules:
 
-```text
-~/.config/capsules/bootstrap/<container_id>/
-```
+| Variable | Description |
+|---|---|
+| `CAPSULE_USERNAME` | Your host username |
+| `CAPSULE_HOMEDIR` | The capsule home root dir (default: `/home`) |
 
-That directory is copied into the container at:
+#### Advanced blueprints:
 
-```text
-/files/.bootstrap/
-```
+You can add more files to your blueprint and have them be available in your capsule's `.capsules` folder. This is useful if you want to include profiles or additional scripts and use them inside then `init.sh` files.
 
-Then Capsules runs:
-
-```bash
-bash /files/.bootstrap/init.sh
-```
-
-So you probably want at least:
-
-```text
-~/.config/capsules/bootstrap/<container_id>/init.sh
-```
-
-to install packages, create users, tweak configs, etc.
-
----
-
-### Hard-coded paths (a.k.a. “things you might want to change”)
-
-Right now the code assumes:
-
-- Dotfiles config: `/files/projects/dotfiles/config` mounted to
-  `$CAPSULE_HOMEDIR/$USER/.config`
-- Fonts: `/files/projects/dotfiles/fonts` mounted to
-  `$CAPSULE_HOMEDIR/$USER/.fonts`
-- PulseAudio socket: `/run/user/1000/pulse` → `/run/user/host/pulse`
-
-If your setup is different, you’ll probably want to tweak `spin_a_new_capsule` in `main.rs`.
 
 ---
 

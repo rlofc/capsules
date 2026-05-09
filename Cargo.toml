@@ -2,7 +2,7 @@
 name = "capsules"
 authors = ["Ithai Levi"]
 description = "Hierarchical listboards for your terminal"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.88"
 repository = "https://github.com/rlofc/capsules"
@@ -10,6 +10,7 @@ license-file = "./LICENSE"
 readme = "./README.md"
 
 [dependencies]
+anyhow = "1"
 clap = { version = "4.5.53", features = ["cargo"] }
 serde = { version = "1.0.228", default-features = false, features = ["derive"] }
 toml = "0.8"
