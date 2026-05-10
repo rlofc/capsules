@@ -4,6 +4,9 @@
 
 # Capsules
 
+[![CI](https://github.com/rlofc/capsules/actions/workflows/ci.yml/badge.svg)](https://github.com/rlofc/capsules/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/capsules.svg)](https://crates.io/crates/capsules)
+
 A tiny CLI wrapper around [Podman](https://podman.io/) for spinning up **capsules** - task-centric containers that keep your __Linux__ host OS clean and your various environments nicely boxed in.
 
 Think of it as a closed-by-default, simpler alternative to distrobox.
@@ -46,7 +49,7 @@ tar -xzf - --wildcards --strip-components=2 --skip-old-files -C ~/.config/capsul
 
 ```sh
 mkdir my_capsule && cd my_capsule
-capsules init debian && capsules create my_capsule && capsules exec my_capsule bash
+capsules init debian && capsules create my_capsule && capsules run my_capsule bash
 ```
 
 ### Mounting your workspace
@@ -57,7 +60,7 @@ Change `/your/projects/dir` to where your workspace is. It will be mounted as a 
 mkdir my_capsule && cd my_capsule
 capsules init debian
 capsules create my_capsule --volume /your/projects/dir:/your/projects/dir
-capsules exec my_capsule bash
+capsules run my_capsule bash
 ```
 
 
@@ -75,7 +78,7 @@ Usage: capsules [COMMAND]
 Commands:
   list     List all capsules
   console  Start a console root session
-  exec     Executes a command in a running container
+  run      Executes a command in a running container
   init     Init container volume
   create   Spins up a new container
   start    Starts a container
