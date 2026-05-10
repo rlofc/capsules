@@ -15,6 +15,14 @@ pub struct CapsuleFile {
 }
 
 impl Config {
+    #[cfg(test)]
+    pub fn new(capsule_volume_dir: Option<String>, capsule_home_dir: Option<String>) -> Self {
+        Config {
+            capsule_volume_dir,
+            capsule_home_dir,
+        }
+    }
+
     pub fn load() -> Self {
         let home_dir = env::home_dir().expect("Could not get home directory");
         let config_dir = home_dir.join(".config").join("capsules");

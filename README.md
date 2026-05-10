@@ -46,7 +46,7 @@ tar -xzf - --wildcards --strip-components=2 --skip-old-files -C ~/.config/capsul
 
 ```sh
 mkdir my_capsule && cd my_capsule
-capsules init debian && capsules spin my_capsule && capsules exec my_capsule bash
+capsules init debian && capsules create my_capsule && capsules exec my_capsule bash
 ```
 
 ### Mounting your workspace
@@ -56,7 +56,7 @@ Change `/your/projects/dir` to where your workspace is. It will be mounted as a 
 ```sh
 mkdir my_capsule && cd my_capsule
 capsules init debian
-capsules spin my_capsule --volume /your/projects/dir:/your/projects/dir
+capsules create my_capsule --volume /your/projects/dir:/your/projects/dir
 capsules exec my_capsule bash
 ```
 
@@ -68,7 +68,7 @@ capsules exec my_capsule bash
 ```
 $ capsules --help
 
-Secure-by-default containers for operating-system hygene
+Secure-by-default containers for operating-system hygiene
 
 Usage: capsules [COMMAND]
 
@@ -77,7 +77,7 @@ Commands:
   console  Start a console root session
   exec     Executes a command in a running container
   init     Init container volume
-  spin     Spins up a new container
+  create   Spins up a new container
   start    Starts a container
   stop     Stops a container
   delete   Deletes a container
@@ -181,5 +181,4 @@ Issues, ideas, and PRs are all welcome.
 
 ## License
 
-This project is licensed under the BSD 3-Clause License.
-See the [LICENSE](LICENSE) file for the boring legal details.
+This project is [licensed](LICENSE) under the BSD 3-Clause License.
