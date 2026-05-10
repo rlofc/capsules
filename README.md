@@ -76,11 +76,11 @@ Secure-by-default containers for operating-system hygiene
 Usage: capsules [COMMAND]
 
 Commands:
-  list     List all capsules
-  console  Start a console root session
-  run      Executes a command in a running container
   init     Init container volume
   create   Spins up a new container
+  run      Executes a command in a running capsule
+  list     List all capsules
+  console  Start a console root session
   start    Starts a container
   stop     Stops a container
   delete   Deletes a container

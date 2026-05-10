@@ -41,20 +41,6 @@ fn main() -> Result<()> {
         .about("Secure-by-default containers for operating-system hygiene")
         .version(clap::crate_version!())
         .author("Ithai Levi")
-        .subcommand(clap::Command::new("list").about("List all capsules"))
-        .subcommand(
-            clap::Command::new("console")
-                .about("Start a console root session")
-                .arg(clap::Arg::new("container_id").required(true))
-                .arg(clap::Arg::new("command").required(false)),
-        )
-        .subcommand(
-            clap::Command::new("run")
-                .about("Executes a command in a running capsule")
-                .arg(clap::Arg::new("container_id").required(true))
-                .arg(clap::Arg::new("command").required(true))
-                .arg(clap::Arg::new("args").required(false).num_args(1..)),
-        )
         .subcommand(
             clap::Command::new("init")
                 .about("Init container volume")
@@ -91,6 +77,20 @@ fn main() -> Result<()> {
                         .required(false)
                         .action(clap::ArgAction::SetTrue),
                 ),
+        )
+        .subcommand(
+            clap::Command::new("run")
+                .about("Executes a command in a running capsule")
+                .arg(clap::Arg::new("container_id").required(true))
+                .arg(clap::Arg::new("command").required(true))
+                .arg(clap::Arg::new("args").required(false).num_args(1..)),
+        )
+        .subcommand(clap::Command::new("list").about("List all capsules"))
+        .subcommand(
+            clap::Command::new("console")
+                .about("Start a console root session")
+                .arg(clap::Arg::new("container_id").required(true))
+                .arg(clap::Arg::new("command").required(false)),
         )
         .subcommand(
             clap::Command::new("start")
