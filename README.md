@@ -71,7 +71,7 @@ capsules run my_capsule bash
 ```
 $ capsules --help
 
-Secure-by-default containers for operating-system hygiene
+Isolated workspace containers for operating-system hygiene
 
 Usage: capsules [COMMAND]
 
@@ -140,9 +140,14 @@ Blueprints live under `~/.config/capsules/<name>/`. Each blueprint is a director
 
 ```dockerfile
 FROM debian:latest
+RUN echo "my-blueprint" > /etc/hostname
+ENV LANG=en_US.UTF-8
+ENV CAPSULE_USERNAME=$CAPSULE_USERNAME
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     sudo curl bash
+
+RUN echo "$CAPSULE_USERNAME ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 ```
 
 **capsule.toml** - maps this blueprint directory to the Docker image tag:
@@ -151,11 +156,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 blueprint = "my-blueprint"
 ```
 
-**init.sh** - runs inside the container after it starts (as root):
+**init.sh** - runs inside the container after it starts (as root), but is mostly
+useful for setting things up for your user:
 
 ```bash
 #!/bin/bash
-echo "$CAPSULE_USERNAME ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+# Set up your home environment, dotfiles, etc - using something like:
+# sudo -u $CAPSULE_USERNAME bash -c '\
+#   git clone https://github.com/your/dotfiles \
+#   && bash ~/dotfiles/setup.sh
+# '
 ```
 
 The `init.sh` script has access to these environment variables set by Capsules:
@@ -175,10 +186,6 @@ You can add more files to your blueprint and have them be available in your caps
 ## Contribution
 
 Issues, ideas, and PRs are all welcome.
-
-- Found a bug? Open an issue.
-- Want another subcommand? Open an issue or draft a PR.
-- Have a wild idea for capsule presets, templates, or better defaults? Definitely open an issue.
 
 ---
 

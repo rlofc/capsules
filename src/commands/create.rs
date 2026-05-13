@@ -146,46 +146,6 @@ mod tests {
     }
 
     #[test]
-    fn test_init_uses_correct_filesystem_and_command_calls() {
-        let fs_mock = FileSystemMock::new("vaxvms");
-        let fs_log = fs_mock.log();
-        let mut caps = Capsules::new(Config::new(None, None))
-            .with_fs(fs_mock)
-            .with_tar(CommandWrapperMock::new("tar"))
-            .with_podman(CommandWrapperMock::new("podman"));
-
-        let result = caps.init_container_volume("vaxvms");
-
-        assert!(result.is_ok());
-
-        let calls = fs_log.borrow().clone();
-        assert_eq!(calls.len(), 3);
-        assert_eq!(
-            calls[0],
-            FsCall::PathExists(PathBuf::from("/mock/home/.config/capsules/vaxvms"))
-        );
-        assert_eq!(
-            calls[1],
-            FsCall::PathExists(PathBuf::from("/mock/work/.capsules"))
-        );
-        assert_eq!(
-            calls[2],
-            FsCall::CopyDir(
-                PathBuf::from("/mock/home/.config/capsules/vaxvms"),
-                PathBuf::from("/mock/work/.capsules"),
-            )
-        );
-
-        let tar_line = caps.tar_cmd_ref().command_line();
-        assert!(tar_line.starts_with("tar -czh . (cwd: "));
-        assert!(tar_line.ends_with("/.capsules)"));
-        assert_eq!(
-            caps.podman_cmd_ref().command_line(),
-            "podman build -t vaxvms -"
-        );
-    }
-
-    #[test]
     fn test_spin_a_new_capsule_with_init() {
         let fs_mock = FileSystemMock::new("vaxvms");
         let fs_log = fs_mock.log();

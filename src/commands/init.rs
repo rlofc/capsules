@@ -30,9 +30,22 @@ impl<F: FileSystem, T: CommandWrapper, P: CommandWrapper> Capsules<F, T, P> {
             .spawn()
             .context("Failed to spawn tar")?;
 
+        let capsule_username = self.fs.env_var("USER")?;
+        let capsule_volume_dir = self.cfg.capsule_volume_dir();
+        let capsule_home_dir = self.cfg.capsule_home_dir();
+
         let mut podman = self
             .podman_cmd
-            .args(&["build", "-t", blueprint, "-"])
+            .args(&["build"])
+            .args(&[
+                "--build-arg",
+                &format!("CAPSULE_HOMEDIR={capsule_volume_dir}/{capsule_home_dir}"),
+            ])
+            .args(&[
+                "--build-arg",
+                &format!("CAPSULE_USERNAME={}", capsule_username),
+            ])
+            .args(&["-t", blueprint, "-"])
             .stdin(tar.take_stdout().unwrap())
             .spawn()
             .context("Failed to spawn podman build")?;
@@ -69,7 +82,7 @@ mod tests {
         assert!(result.is_ok());
 
         let calls = fs_log.borrow().clone();
-        assert_eq!(calls.len(), 3);
+        assert_eq!(calls.len(), 4);
         assert_eq!(
             calls[0],
             FsCall::PathExists(PathBuf::from("/mock/home/.config/capsules/os370"))
@@ -91,7 +104,7 @@ mod tests {
         assert!(tar_line.ends_with("/.capsules)"));
         assert_eq!(
             caps.podman_cmd_ref().command_line(),
-            "podman build -t os370 -"
+            "podman build --build-arg CAPSULE_HOMEDIR=/files/home --build-arg CAPSULE_USERNAME=testuser -t os370 -"
         );
     }
 }

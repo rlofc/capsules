@@ -38,7 +38,7 @@ use anyhow::Result;
 fn main() -> Result<()> {
     let cfg = Config::load();
     let matches = clap::Command::new("Capsules")
-        .about("Secure-by-default containers for operating-system hygiene")
+        .about("Isolated workspace containers for operating-system hygiene")
         .version(clap::crate_version!())
         .author("Ithai Levi")
         .subcommand(
