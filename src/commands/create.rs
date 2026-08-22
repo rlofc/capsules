@@ -54,7 +54,7 @@ impl<F: FileSystem, T: CommandWrapper, P: CommandWrapper> Capsules<F, T, P> {
 
         self.podman_cmd
             .reset()
-            .args(&["run", "-d", "-h", container_id])
+            .args(&["run", "--init", "-d", "-h", container_id])
             .args(&["-e", &format!("DISPLAY={display}")])
             .args(&[
                 "--net=host",
