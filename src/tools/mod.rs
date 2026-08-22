@@ -94,6 +94,7 @@ pub trait FileSystem {
     fn create_dir_all(&self, path: &Path) -> Result<()>;
     fn read_to_string(&self, path: &Path) -> Result<String>;
     fn env_var(&self, key: &str) -> Result<String>;
+    fn confirm(&self, prompt: &str) -> Result<bool>;
 }
 
 pub struct FileSystemImpl;
@@ -120,6 +121,16 @@ impl FileSystem for FileSystemImpl {
     }
     fn env_var(&self, key: &str) -> Result<String> {
         env::var(key).with_context(|| format!("${key} is not set or cannot be used"))
+    }
+    fn confirm(&self, prompt: &str) -> Result<bool> {
+        use std::io::Write;
+        print!("{prompt}");
+        std::io::stdout().flush().ok();
+        let mut input = String::new();
+        std::io::stdin()
+            .read_line(&mut input)
+            .context("Failed to read confirmation")?;
+        Ok(input.trim().eq_ignore_ascii_case("y"))
     }
 }
 
@@ -151,6 +162,7 @@ pub mod tests {
         capsules_exist: bool,
         capsule_toml: String,
         env_values: std::collections::HashMap<String, String>,
+        confirm_answer: bool,
     }
 
     impl FileSystemMock {
@@ -165,7 +177,12 @@ pub mod tests {
                 capsules_exist: false,
                 capsule_toml: format!("blueprint = \"{}\"", blueprint),
                 env_values,
+                confirm_answer: false,
             }
+        }
+        pub fn with_confirm(mut self, answer: bool) -> Self {
+            self.confirm_answer = answer;
+            self
         }
         pub fn log(&self) -> CallLog {
             self.log.clone()
@@ -216,6 +233,9 @@ pub mod tests {
                 .cloned()
                 .ok_or_else(|| anyhow::anyhow!("${} not set", key))
         }
+        fn confirm(&self, _prompt: &str) -> Result<bool> {
+            Ok(self.confirm_answer)
+        }
     }
 
     pub struct CommandWrapperMock {
@@ -223,6 +243,7 @@ pub mod tests {
         args: Vec<String>,
         dir: Option<String>,
         container_exists: bool,
+        inspect_output: String,
         command_log: Rc<RefCell<Vec<String>>>,
     }
 
@@ -233,8 +254,17 @@ pub mod tests {
                 args: vec![],
                 dir: None,
                 container_exists: false,
+                inspect_output: String::new(),
                 command_log: Rc::new(RefCell::new(vec![])),
             }
+        }
+        pub fn with_container_exists(mut self, exists: bool) -> Self {
+            self.container_exists = exists;
+            self
+        }
+        pub fn with_inspect_output(mut self, output: &str) -> Self {
+            self.inspect_output = output.to_string();
+            self
         }
         pub fn command_log(&self) -> Rc<RefCell<Vec<String>>> {
             self.command_log.clone()
@@ -275,13 +305,18 @@ pub mod tests {
         fn output(&mut self) -> Result<CommandOutput> {
             self.command_log.borrow_mut().push(self.command_line());
             let exists_check = self.args.iter().any(|a| a == "exists");
+            let inspect_check = self.args.iter().any(|a| a == "inspect");
             Ok(CommandOutput {
                 success: if exists_check {
                     self.container_exists
                 } else {
                     true
                 },
-                stdout: String::new(),
+                stdout: if inspect_check {
+                    self.inspect_output.clone()
+                } else {
+                    String::new()
+                },
             })
         }
         fn reset(&mut self) -> &mut Self {

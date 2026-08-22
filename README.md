@@ -63,6 +63,22 @@ capsules create my_capsule --volume /your/projects/dir:/your/projects/dir
 capsules run my_capsule bash
 ```
 
+### Recreating a capsule
+
+Changed your mind about the run options after `create`? `recreate` commits the container's current state to a new image, removes the old container, and starts a fresh one from that image using a new set of run args - without losing anything you've installed or configured inside it.
+
+```sh
+capsules recreate my_capsule --volume /more/of/your/projects:/more/of/your/projects
+```
+
+Since the new container is started from a commit of the old one, `init.sh` is **not** run again.
+
+Useful flags:
+
+- `--with-volumes` - carry over any extra bind mounts (beyond the defaults) the existing container already had
+- `--debug` - print the `podman run` command that would be used and confirm before running it
+- `--no-gpu` / `--no-pulse` - same meaning as on `create`
+
 
 ## User Guide
 
@@ -76,15 +92,16 @@ Isolated workspace containers for operating-system hygiene
 Usage: capsules [COMMAND]
 
 Commands:
-  init     Init container volume
-  create   Spins up a new container
-  run      Executes a command in a running capsule
-  list     List all capsules
-  console  Start a console root session
-  start    Starts a container
-  stop     Stops a container
-  delete   Deletes a container
-  help     Print this message or the help of the given subcommand(s)
+  init      Init container volume
+  create    Spins up a new container
+  recreate  Recreates a container from a commit of its current state, using a new set of run args
+  run       Executes a command in a running capsule
+  list      List all capsules
+  console   Start a console root session
+  start     Starts a container
+  stop      Stops a container
+  delete    Deletes a container
+  help      Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help     Print help

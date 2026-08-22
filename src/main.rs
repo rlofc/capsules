@@ -79,6 +79,45 @@ fn main() -> Result<()> {
                 ),
         )
         .subcommand(
+            clap::Command::new("recreate")
+                .about("Recreates a container from a commit of its current state, using a new set of run args")
+                .arg(clap::Arg::new("container_id").required(true))
+                .arg(
+                    clap::Arg::new("volume")
+                        .long("volume")
+                        .short('v')
+                        .num_args(1..)
+                        .value_name("host_path:container_path")
+                        .help("Bind mount a volume (can be used multiple times)"),
+                )
+                .arg(
+                    clap::Arg::new("no-gpu")
+                        .long("no-gpu")
+                        .required(false)
+                        .action(clap::ArgAction::SetTrue),
+                )
+                .arg(
+                    clap::Arg::new("no-pulse")
+                        .long("no-pulse")
+                        .required(false)
+                        .action(clap::ArgAction::SetTrue),
+                )
+                .arg(
+                    clap::Arg::new("with-volumes")
+                        .long("with-volumes")
+                        .required(false)
+                        .action(clap::ArgAction::SetTrue)
+                        .help("Carry over extra bind mounts the existing container already had"),
+                )
+                .arg(
+                    clap::Arg::new("debug")
+                        .long("debug")
+                        .required(false)
+                        .action(clap::ArgAction::SetTrue)
+                        .help("Print the podman run command and confirm before running it"),
+                ),
+        )
+        .subcommand(
             clap::Command::new("run")
                 .about("Executes a command in a running capsule")
                 .arg(clap::Arg::new("container_id").required(true))
@@ -146,6 +185,27 @@ fn main() -> Result<()> {
             None => Vec::new(),
         };
         Capsules::new(cfg.clone()).create_a_new_capsule(container_id, volumes, init, &options)?;
+    }
+
+    if let Some(matches) = matches.subcommand_matches("recreate") {
+        let options = CapsuleOptions {
+            no_gpu: matches.get_flag("no-gpu"),
+            no_pulse: matches.get_flag("no-pulse"),
+        };
+        let container_id = matches.get_one::<String>("container_id").unwrap();
+        let volumes = match matches.get_many::<String>("volume") {
+            Some(volumes) => volumes.map(|v| v.to_owned()).collect(),
+            None => Vec::new(),
+        };
+        let with_volumes = matches.get_flag("with-volumes");
+        let debug = matches.get_flag("debug");
+        Capsules::new(cfg.clone()).recreate_capsule(
+            container_id,
+            volumes,
+            with_volumes,
+            debug,
+            &options,
+        )?;
     }
 
     if let Some(matches) = matches.subcommand_matches("delete") {

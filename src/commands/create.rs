@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use anyhow::{Context, Result};
 
 use crate::{
@@ -43,6 +45,46 @@ impl<F: FileSystem, T: CommandWrapper, P: CommandWrapper> Capsules<F, T, P> {
             .blueprint
             .context("Missing blueprint in capsule.toml")?;
 
+        self.run_capsule_container(
+            container_id,
+            &blueprint,
+            &volumes_path,
+            &capsule_username,
+            &additional_volumes,
+            options,
+        )?;
+
+        if init {
+            self.run_capsule_init(container_id)?;
+        }
+        Ok(())
+    }
+
+    /// The bind mounts every capsule gets regardless of `--volume`/`--no-pulse`,
+    /// used to tell "extra" volumes a container already had apart from this scaffolding.
+    pub(crate) fn default_run_volumes(&self, volumes_path: &Path) -> Vec<String> {
+        let capsule_volume_dir = self.cfg.capsule_volume_dir();
+        vec![
+            "/dev/shm:/dev/shm:rw".to_string(),
+            format!(
+                "{}:{}:rw",
+                volumes_path.to_str().unwrap(),
+                capsule_volume_dir
+            ),
+            "/dev/snd:/dev/snd:rw".to_string(),
+            "/run/user/1000/pulse:/run/user/host/pulse:rw".to_string(),
+        ]
+    }
+
+    pub(crate) fn build_run_args(
+        &mut self,
+        container_id: &str,
+        image: &str,
+        volumes_path: &Path,
+        capsule_username: &str,
+        additional_volumes: &[String],
+        options: &CapsuleOptions,
+    ) -> Vec<String> {
         let volumes_path_as_str = volumes_path.to_str().unwrap().to_string();
         let capsule_volume_dir = self.cfg.capsule_volume_dir();
         let container_volume = format!("{volumes_path_as_str}:{capsule_volume_dir}:rw");
@@ -52,48 +94,71 @@ impl<F: FileSystem, T: CommandWrapper, P: CommandWrapper> Capsules<F, T, P> {
             .env_var("DISPLAY")
             .unwrap_or_else(|_| ":0".to_string());
 
-        self.podman_cmd
-            .reset()
-            .args(&["run", "--init", "-d", "-h", container_id])
-            .args(&["-e", &format!("DISPLAY={display}")])
-            .args(&[
-                "--net=host",
-                "--userns=keep-id",
-                "--user=root",
-                "--pids-limit=-1",
-            ])
-            .args(&["-v", "/dev/shm:/dev/shm:rw"])
-            .args(&["-v", &container_volume]);
+        let mut args: Vec<String> = vec![
+            "run".into(),
+            "--init".into(),
+            "-d".into(),
+            "-h".into(),
+            container_id.into(),
+            "-e".into(),
+            format!("DISPLAY={display}"),
+            "--net=host".into(),
+            "--userns=keep-id".into(),
+            "--user=root".into(),
+            "--pids-limit=-1".into(),
+            "-v".into(),
+            "/dev/shm:/dev/shm:rw".into(),
+            "-v".into(),
+            container_volume,
+        ];
 
         if !options.no_gpu {
-            self.podman_cmd.args(&["--gpus", "all"]);
+            args.push("--gpus".into());
+            args.push("all".into());
         }
 
         if !options.no_pulse {
-            self.podman_cmd
-                .args(&["-v", "/dev/snd:/dev/snd:rw"])
-                .args(&["-v", "/run/user/1000/pulse:/run/user/host/pulse:rw"]);
+            args.push("-v".into());
+            args.push("/dev/snd:/dev/snd:rw".into());
+            args.push("-v".into());
+            args.push("/run/user/1000/pulse:/run/user/host/pulse:rw".into());
         }
 
-        for vol in &additional_volumes {
-            self.podman_cmd.args(&["-v", vol]);
+        for vol in additional_volumes {
+            args.push("-v".into());
+            args.push(vol.clone());
         }
 
         if !options.no_pulse {
-            self.podman_cmd
-                .args(&["-e", "PULSE_SERVER=unix:/run/user/host/pulse/native"]);
+            args.push("-e".into());
+            args.push("PULSE_SERVER=unix:/run/user/host/pulse/native".into());
         }
 
+        args.push("-e".into());
+        args.push(format!("BOOTSTRAP={}.sh", container_id));
+        args.push("-e".into());
+        args.push(format!(
+            "CAPSULE_HOMEDIR={capsule_volume_dir}/{capsule_home_dir}"
+        ));
+        args.push("-e".into());
+        args.push(format!("CAPSULE_USERNAME={}", capsule_username));
+        args.push("--name".into());
+        args.push(format!("capsule-{}", container_id));
+        args.push(image.to_string());
+        args.push("tail".into());
+        args.push("-f".into());
+        args.push("/dev/null".into());
+
+        args
+    }
+
+    pub(crate) fn execute_run_args(&mut self, args: &[String]) -> Result<()> {
+        println!("Starting container...");
+        let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
         let output = self
             .podman_cmd
-            .args(&["-e", &format!("BOOTSTRAP={}.sh", container_id)])
-            .args(&[
-                "-e",
-                &format!("CAPSULE_HOMEDIR={capsule_volume_dir}/{capsule_home_dir}"),
-            ])
-            .args(&["-e", &format!("CAPSULE_USERNAME={}", capsule_username)])
-            .args(&["--name", &format!("capsule-{}", container_id)])
-            .args(&[&blueprint, "tail", "-f", "/dev/null"])
+            .reset()
+            .args(&arg_refs)
             .output()
             .context("Failed to execute podman run command")?;
 
@@ -102,19 +167,41 @@ impl<F: FileSystem, T: CommandWrapper, P: CommandWrapper> Capsules<F, T, P> {
             output.stdout,
             if output.success { "success" } else { "failed" },
         );
+        Ok(())
+    }
 
-        if init {
-            let capsule_volume_dir = self.cfg.capsule_volume_dir();
-            self.podman_cmd
-                .reset()
-                .args(&["exec", "--user=root"])
-                .args(&[&format!("capsule-{}", container_id)])
-                .args(&["bash", &format!("{capsule_volume_dir}/.capsules/init.sh")])
-                .spawn()
-                .context("Failed to spawn init command")?
-                .wait()
-                .context("Failed to wait on init command")?;
-        }
+    pub(crate) fn run_capsule_container(
+        &mut self,
+        container_id: &str,
+        image: &str,
+        volumes_path: &Path,
+        capsule_username: &str,
+        additional_volumes: &[String],
+        options: &CapsuleOptions,
+    ) -> Result<()> {
+        let args = self.build_run_args(
+            container_id,
+            image,
+            volumes_path,
+            capsule_username,
+            additional_volumes,
+            options,
+        );
+        self.execute_run_args(&args)
+    }
+
+    pub(crate) fn run_capsule_init(&mut self, container_id: &str) -> Result<()> {
+        println!("Running init script...");
+        let capsule_volume_dir = self.cfg.capsule_volume_dir();
+        self.podman_cmd
+            .reset()
+            .args(&["exec", "--user=root"])
+            .args(&[&format!("capsule-{}", container_id)])
+            .args(&["bash", &format!("{capsule_volume_dir}/.capsules/init.sh")])
+            .spawn()
+            .context("Failed to spawn init command")?
+            .wait()
+            .context("Failed to wait on init command")?;
         Ok(())
     }
 }
@@ -130,7 +217,7 @@ mod tests {
     };
 
     fn assert_run_command(cmd: &str) {
-        assert!(cmd.starts_with("podman run -d -h foo -e DISPLAY=:99"));
+        assert!(cmd.starts_with("podman run --init -d -h foo -e DISPLAY=:99"));
         assert!(cmd.contains("--net=host --userns=keep-id --user=root --pids-limit=-1"));
         assert!(cmd.contains("-v /dev/shm:/dev/shm:rw"));
         assert!(cmd.contains("-v /mock/work:/files:rw"));
